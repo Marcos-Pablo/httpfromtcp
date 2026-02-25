@@ -22,34 +22,49 @@ func main() {
 	fmt.Printf("Reading data from %s\n", inputFilePath)
 	fmt.Println("=====================================")
 
+	ch := getLinesChannel(file)
+
+	for str := range ch {
+		fmt.Printf("read: %s\n", str)
+	}
+}
+
+func getLinesChannel(f io.Reader) <-chan string {
+	ch := make(chan string)
+
 	line := make([]byte, 0, 64)
 	buff := make([]byte, 8)
-	for {
-		n, err := file.Read(buff)
-
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			log.Fatalf("couldn't read from file: %s", err)
-		}
-
-		chunk := buff[:n]
+	go func() {
+		defer close(ch)
 		for {
-			i := bytes.IndexByte(chunk, '\n')
-			if i == -1 {
-				line = append(line, chunk...)
-				break
+			n, err := f.Read(buff)
+
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				log.Fatalf("couldn't read from file: %s", err)
 			}
 
-			line = append(line, chunk[:i]...)
-			fmt.Printf("read: %s\n", string(line))
-			line = line[:0]
-			chunk = chunk[i+1:]
-		}
-	}
+			chunk := buff[:n]
+			for {
+				i := bytes.IndexByte(chunk, '\n')
+				if i == -1 {
+					line = append(line, chunk...)
+					break
+				}
 
-	if len(line) > 0 {
-		fmt.Printf("read: %s\n", string(line))
-	}
+				line = append(line, chunk[:i]...)
+				ch <- string(line)
+				line = line[:0]
+				chunk = chunk[i+1:]
+			}
+		}
+
+		if len(line) > 0 {
+			ch <- string(line)
+		}
+	}()
+
+	return ch
 }
