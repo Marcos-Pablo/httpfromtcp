@@ -1,12 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
+
+	"github.com/Marcos-Pablo/httpfromtcp/internal/request"
 )
 
 const network = "tcp"
@@ -33,52 +32,18 @@ func main() {
 		}
 
 		fmt.Println("Accepted connection from", conn.RemoteAddr())
-		ch := getLinesChannel(conn)
+		req, err := request.RequestFromReader(conn)
 
-		for msg := range ch {
-			fmt.Println(msg)
+		if err != nil {
+			log.Printf("Unable to parse request: %s", err)
+			continue
 		}
+
+		fmt.Println("Request line:")
+		fmt.Printf("- Method: %s\n", req.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", req.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", req.RequestLine.HttpVersion)
 
 		fmt.Println("Connection to ", conn.RemoteAddr(), "closed")
 	}
-}
-
-func getLinesChannel(f io.Reader) <-chan string {
-	ch := make(chan string)
-
-	line := make([]byte, 0, 64)
-	buff := make([]byte, 8)
-	go func() {
-		defer close(ch)
-		for {
-			n, err := f.Read(buff)
-
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				log.Fatalf("couldn't read from file: %s", err)
-			}
-
-			chunk := buff[:n]
-			for {
-				i := bytes.IndexByte(chunk, '\n')
-				if i == -1 {
-					line = append(line, chunk...)
-					break
-				}
-
-				line = append(line, chunk[:i]...)
-				ch <- string(line)
-				line = line[:0]
-				chunk = chunk[i+1:]
-			}
-		}
-
-		if len(line) > 0 {
-			ch <- string(line)
-		}
-	}()
-
-	return ch
 }

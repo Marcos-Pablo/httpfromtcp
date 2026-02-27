@@ -47,8 +47,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				req.State = Done
-				break
+				if req.State != Done {
+					return nil, fmt.Errorf("incomplete request")
+				}
 			}
 			return nil, err
 		}
