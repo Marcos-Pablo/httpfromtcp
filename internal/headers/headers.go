@@ -39,6 +39,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	if idx == 0 {
+		fmt.Println("end")
 		return len(crlf), true, nil
 	}
 
@@ -73,7 +74,16 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 func (h Headers) Set(key, value string) {
 	key = strings.ToLower(key)
-	h[key] = value
+	prevVal, ok := h[key]
+	fmt.Println(key)
+
+	if !ok {
+		h[key] = value
+		return
+	}
+
+	newValue := fmt.Sprintf("%s, %s", prevVal, value)
+	h[key] = newValue
 }
 
 func validTokens(data string) bool {
