@@ -84,6 +84,12 @@ func (h Headers) Set(key, value string) {
 	h[key] = newValue
 }
 
+func (h Headers) Get(key string) (string, bool) {
+	key = strings.ToLower(key)
+	value, ok := h[key]
+	return value, ok
+}
+
 func validTokens(data string) bool {
 	for _, char := range data {
 		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {

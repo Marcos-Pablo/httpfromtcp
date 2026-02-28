@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/Marcos-Pablo/httpfromtcp/internal/headers"
@@ -17,13 +18,15 @@ type ParserState int
 
 const (
 	RequestStateInitialized ParserState = iota
-	RequestStateDone
 	RequestStateParsingHeaders
+	RequestStateParsingBody
+	RequestStateDone
 )
 
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 	State       ParserState
 }
 
@@ -39,6 +42,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	req := &Request{
 		State:   RequestStateInitialized,
 		Headers: headers.NewHeaders(),
+		Body:    make([]byte, 0),
 	}
 
 	for req.State != RequestStateDone {
@@ -123,10 +127,35 @@ func (r *Request) parseChunk(data []byte) (int, error) {
 		}
 
 		if done {
-			r.State = RequestStateDone
+			r.State = RequestStateParsingBody
 		}
 
 		return bytesParsed, nil
+	case RequestStateParsingBody:
+		contentLengthStr, ok := r.Headers.Get("Content-Length")
+
+		if !ok {
+			r.State = RequestStateDone
+			return len(data), nil
+		}
+
+		contentLength, err := strconv.Atoi(contentLengthStr)
+
+		if err != nil {
+			return 0, fmt.Errorf("malformed Content-Length: %s", err)
+		}
+
+		r.Body = append(r.Body, data...)
+
+		if len(r.Body) > contentLength {
+			return 0, fmt.Errorf("body length is greater than the provided Content-Length of %d", contentLength)
+		}
+
+		if len(r.Body) == contentLength {
+			r.State = RequestStateDone
+		}
+
+		return len(data), nil
 	case RequestStateDone:
 		return 0, fmt.Errorf("error: trying to read data in a done state")
 	default:
