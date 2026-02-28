@@ -14,6 +14,23 @@ func NewHeaders() Headers {
 
 const crlf = "\r\n"
 
+var specialChars map[rune]struct{} = map[rune]struct{}{
+	'!':  {},
+	'#':  {},
+	'$':  {},
+	'%':  {},
+	'&':  {},
+	'\'': {},
+	'*':  {},
+	'+':  {},
+	'-':  {},
+	'^':  {},
+	'_':  {},
+	'`':  {},
+	'|':  {},
+	'~':  {},
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	idx := bytes.Index(data, []byte(crlf))
 
@@ -36,16 +53,45 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	key := parts[0]
-	value := parts[1]
 
 	if key != strings.TrimRight(key, " ") {
 		return 0, false, fmt.Errorf("poorly formatted header name: %s", key)
 	}
 
 	key = strings.TrimSpace(key)
+	if !validTokens(key) {
+		return 0, false, fmt.Errorf("poorly formatted header name: %s", key)
+	}
+
+	value := parts[1]
 	value = strings.TrimSpace(value)
 
-	h[key] = value
+	h.Set(key, value)
 
 	return bytesProcessed, false, nil
+}
+
+func (h Headers) Set(key, value string) {
+	key = strings.ToLower(key)
+	h[key] = value
+}
+
+func validTokens(data string) bool {
+	for _, char := range data {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {
+			continue
+		}
+
+		if char >= '0' && char <= '9' {
+			continue
+		}
+
+		if _, ok := specialChars[char]; ok {
+			continue
+		}
+
+		return false
+	}
+
+	return len(data) >= 1
 }
