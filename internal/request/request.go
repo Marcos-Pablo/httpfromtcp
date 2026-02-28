@@ -82,6 +82,24 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 func (r *Request) parse(data []byte) (int, error) {
 	totalBytesParsed := 0
+	for r.State != RequestStateDone {
+		bytesParsed, err := r.parseChunk(data[totalBytesParsed:])
+
+		if err != nil {
+			return 0, err
+		}
+
+		totalBytesParsed += bytesParsed
+
+		if bytesParsed == 0 {
+			break
+		}
+	}
+
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseChunk(data []byte) (int, error) {
 	switch r.State {
 	case RequestStateInitialized:
 		reqLine, bytesParsed, err := parseRequestLine(data)
@@ -95,31 +113,20 @@ func (r *Request) parse(data []byte) (int, error) {
 
 		r.RequestLine = *reqLine
 		r.State = RequestStateParsingHeaders
-		totalBytesParsed += bytesParsed
 
-		return totalBytesParsed, nil
+		return bytesParsed, nil
 	case RequestStateParsingHeaders:
-		for {
-			bytesParsed, done, err := r.Headers.Parse(data)
+		bytesParsed, done, err := r.Headers.Parse(data)
 
-			if err != nil {
-				return 0, err
-			}
-
-			totalBytesParsed += bytesParsed
-			data = data[bytesParsed:]
-
-			if done {
-				r.State = RequestStateDone
-				break
-			}
-
-			if bytesParsed == 0 {
-				break
-			}
+		if err != nil {
+			return 0, err
 		}
 
-		return totalBytesParsed, nil
+		if done {
+			r.State = RequestStateDone
+		}
+
+		return bytesParsed, nil
 	case RequestStateDone:
 		return 0, fmt.Errorf("error: trying to read data in a done state")
 	default:
