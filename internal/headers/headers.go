@@ -90,6 +90,11 @@ func (h Headers) Get(key string) (string, bool) {
 	return value, ok
 }
 
+func (h Headers) ReplaceOrSet(key, value string) {
+	key = strings.ToLower(key)
+	h[key] = value
+}
+
 func validTokens(data string) bool {
 	for _, char := range data {
 		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {

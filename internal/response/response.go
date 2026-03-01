@@ -9,6 +9,19 @@ import (
 )
 
 type StatusCode int
+type WriterState int
+
+const (
+	WriterStateStatusLine WriterState = iota
+	WriterStateHeaders
+	WriterStateBody
+	WriterStateDone
+)
+
+type Writer struct {
+	State WriterState
+	buff  io.Writer
+}
 
 const (
 	StatusOK                  StatusCode = 200
@@ -17,7 +30,17 @@ const (
 )
 const crlf = "\r\n"
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{
+		State: WriterStateStatusLine,
+		buff:  w,
+	}
+}
+
+func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
+	if w.State != WriterStateStatusLine {
+		return fmt.Errorf("unable to write status line")
+	}
 	var reasonPhrase string
 	switch statusCode {
 	case StatusOK:
@@ -28,12 +51,13 @@ func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 		reasonPhrase = "HTTP/1.1 500 Internal Server Error"
 	}
 
-	_, err := w.Write([]byte(reasonPhrase + crlf))
+	_, err := w.buff.Write([]byte(reasonPhrase + crlf))
 
 	if err != nil {
 		return fmt.Errorf("Error writing status line: %s", err)
 	}
 
+	w.State = WriterStateHeaders
 	return nil
 }
 
@@ -45,16 +69,29 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 	return defaultHeaders
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
+func (w *Writer) WriteHeaders(headers headers.Headers) error {
+	if w.State != WriterStateHeaders {
+		return fmt.Errorf("unable to write headers")
+	}
 	for k, v := range headers {
-		_, err := fmt.Fprintf(w, "%s: %s%s", k, v, crlf)
+		_, err := fmt.Fprintf(w.buff, "%s: %s%s", k, v, crlf)
 		if err != nil {
 			return err
 		}
 	}
-	_, err := fmt.Fprintf(w, crlf)
+	_, err := fmt.Fprintf(w.buff, crlf)
 	if err != nil {
 		return err
 	}
+	w.State = WriterStateBody
 	return nil
+}
+
+func (w *Writer) WriteBody(p []byte) (int, error) {
+	if w.State != WriterStateBody {
+		return 0, fmt.Errorf("unable to write body")
+	}
+	n, err := w.buff.Write(p)
+	w.State = WriterStateDone
+	return n, err
 }
