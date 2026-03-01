@@ -8,8 +8,6 @@ import (
 	"github.com/Marcos-Pablo/httpfromtcp/internal/headers"
 )
 
-const crlf = "\r\n"
-
 type StatusCode int
 
 const (
@@ -17,6 +15,7 @@ const (
 	StatusBadRequest          StatusCode = 400
 	StatusInternalServerError StatusCode = 500
 )
+const crlf = "\r\n"
 
 func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 	var reasonPhrase string
