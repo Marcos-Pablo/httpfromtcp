@@ -12,7 +12,6 @@ const network = "tcp"
 const address = ":42069"
 
 func main() {
-
 	listener, err := net.Listen(network, address)
 
 	if err != nil {
