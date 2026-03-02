@@ -111,5 +111,31 @@ func (w *Writer) WriteChunkedBodyDone() (int, error) {
 		return 0, fmt.Errorf("cannot write body in state %d", w.State)
 	}
 
-	return w.buff.Write([]byte("0" + crlf + crlf))
+	return w.buff.Write([]byte("0" + crlf))
+}
+
+func (w *Writer) WriteBodyDone() (int, error) {
+	if w.State != WriterStateBody {
+		return 0, fmt.Errorf("cannot write body in state %d", w.State)
+	}
+
+	return w.buff.Write([]byte(crlf))
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	if w.State != WriterStateBody {
+		return fmt.Errorf("unable to write headers")
+	}
+	for k, v := range h {
+		_, err := fmt.Fprintf(w.buff, "%s: %s%s", k, v, crlf)
+		if err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintf(w.buff, crlf)
+	if err != nil {
+		return err
+	}
+	w.State = WriterStateBody
+	return nil
 }
